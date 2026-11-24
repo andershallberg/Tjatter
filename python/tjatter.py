@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ctypes
 import json
 import os
 import queue
@@ -574,7 +575,37 @@ class TjatterApp:
         self.root.destroy()
 
 
+def _enable_windows_dpi_awareness() -> None:
+    if os.name != "nt":
+        return
+
+    user32 = ctypes.WinDLL("user32", use_last_error=True)
+    try:
+        set_awareness = user32.SetProcessDpiAwarenessContext
+    except AttributeError:
+        shcore = ctypes.WinDLL("shcore", use_last_error=True)
+        set_awareness = shcore.SetProcessDpiAwareness
+        set_awareness.argtypes = [ctypes.c_int]
+        set_awareness.restype = ctypes.c_long
+        result = int(set_awareness(2)) & 0xFFFFFFFF
+        if result in (0, 0x80070005):
+            return
+        raise OSError(
+            f"Could not set Windows DPI awareness (HRESULT 0x{result:08X})."
+        )
+
+    set_awareness.argtypes = [ctypes.c_void_p]
+    set_awareness.restype = ctypes.c_bool
+    if set_awareness(ctypes.c_void_p(-4)):
+        return
+
+    error = ctypes.get_last_error()
+    if error != 5:
+        raise ctypes.WinError(error)
+
+
 def main() -> None:
+    _enable_windows_dpi_awareness()
     root = tk.Tk()
     TjatterApp(root)
     root.mainloop()

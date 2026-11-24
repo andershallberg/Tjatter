@@ -1,8 +1,27 @@
 from __future__ import annotations
 
+import ctypes
+import sys
 import unittest
 
-from tjatter import ChatMessage, _read_reply, create_chat_completions_url
+from tjatter import (
+    ChatMessage,
+    _enable_windows_dpi_awareness,
+    _read_reply,
+    create_chat_completions_url,
+)
+
+
+@unittest.skipUnless(sys.platform == "win32", "Windows DPI API")
+class DpiAwarenessTests(unittest.TestCase):
+    def test_enables_process_dpi_awareness(self) -> None:
+        _enable_windows_dpi_awareness()
+        awareness = ctypes.c_int()
+        result = ctypes.WinDLL("shcore").GetProcessDpiAwareness(
+            None, ctypes.byref(awareness)
+        )
+        self.assertEqual(result, 0)
+        self.assertNotEqual(awareness.value, 0)
 
 
 class EndpointTests(unittest.TestCase):
